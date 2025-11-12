@@ -3,6 +3,8 @@ Implémentation des agents spécialisés.
 """
 
 from .base_agent import BaseAgent, AgentOutput
+from ..utils.helpers import truncate_middle, extract_bulleted_section
+from ..config.settings import PROMPT_LIMITS
 import logging
 
 logger = logging.getLogger(__name__)
@@ -66,7 +68,7 @@ class DeveloperAgent(BaseAgent):
 ITÉRATION: {iteration}
 
 ARCHITECTURE À IMPLÉMENTER:
-{architecture[:2000]}...  # Limiter la longueur
+{truncate_middle(architecture, PROMPT_LIMITS["architecture_context"])}
 
 REQUIREMENTS:
 {requirements}
@@ -115,10 +117,10 @@ class ReviewerAgent(BaseAgent):
 ITÉRATION: {iteration}
 
 CODE À ANALYSER:
-{code[:3000]}...
+{truncate_middle(code, PROMPT_LIMITS["code_context"])}
 
 ARCHITECTURE CIBLE:
-{architecture[:2000]}...
+{truncate_middle(architecture, PROMPT_LIMITS["architecture_context"])}
 
 Effectue un audit complet:
 1. **Conformité architecture** (0-100): Le code respecte-t-il l'architecture?
@@ -150,20 +152,9 @@ RECOMMANDATIONS:
             success=bool(content),
             content=content,
             score=score,
-            issues=self._extract_section(content, "PROBLÈMES"),
-            recommendations=self._extract_section(content, "RECOMMANDATIONS")
+            issues=extract_bulleted_section(content, "PROBLÈMES"),
+            recommendations=extract_bulleted_section(content, "RECOMMANDATIONS")
         )
-    
-    def _extract_section(self, content: str, section_name: str) -> list:
-        """Extrait les éléments d'une section"""
-        import re
-        pattern = f"{section_name}[:\\n]+(.*?)(?=\\n[A-Z]|$)"
-        match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
-        
-        if match:
-            items = re.findall(r"-\s*(.+?)(?=\n-|\n[A-Z]|$)", match.group(1), re.DOTALL)
-            return [item.strip() for item in items if item.strip()]
-        return []
 
 
 class SecurityAgent(BaseAgent):
@@ -185,7 +176,7 @@ class SecurityAgent(BaseAgent):
 ITÉRATION: {iteration}
 
 CODE À AUDITER:
-{code[:3000]}...
+{truncate_middle(code, PROMPT_LIMITS["code_context"])}
 
 REQUIREMENTS:
 {requirements}
@@ -215,18 +206,8 @@ CORRECTIONS RECOMMANDÉES:
             success=bool(content),
             content=content,
             score=max(0, min(100, score)),
-            issues=self._extract_section(content, "VULNÉRABILITÉS"),
+            issues=extract_bulleted_section(content, "VULNÉRABILITÉS"),
         )
-    
-    def _extract_section(self, content: str, section_name: str) -> list:
-        import re
-        pattern = f"{section_name}[:\\n]+(.*?)(?=\\n[A-Z]|$)"
-        match = re.search(pattern, content, re.IGNORECASE | re.DOTALL)
-        
-        if match:
-            items = re.findall(r"-\s*(.+?)(?=\n-|\n[A-Z]|$)", match.group(1), re.DOTALL)
-            return [item.strip() for item in items if item.strip()]
-        return []
 
 
 class TesterAgent(BaseAgent):
@@ -248,7 +229,7 @@ class TesterAgent(BaseAgent):
 ITÉRATION: {iteration}
 
 CODE À TESTER:
-{code[:3000]}...
+{truncate_middle(code, PROMPT_LIMITS["code_context"])}
 
 REQUIREMENTS:
 {requirements}
@@ -303,10 +284,10 @@ REQUIREMENTS:
 {requirements}
 
 ARCHITECTURE:
-{architecture[:2000]}...
+{truncate_middle(architecture, PROMPT_LIMITS["architecture_context"])}
 
 CODE:
-{code[:2000]}...
+{truncate_middle(code, PROMPT_LIMITS["architecture_context"])}
 
 Crée une documentation structurée en markdown:
 1. **README.md** - Vue d'ensemble, installation, usage rapide
