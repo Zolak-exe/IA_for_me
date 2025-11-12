@@ -251,7 +251,7 @@ class Dashboard:
 Itération: {orchestrator.iteration_count}/{orchestrator.max_iterations}
 
 Meilleur score: {orchestrator.best_score:.1f}%
-["█" * int(orchestrator.best_score / 5) + "░" * (20 - int(orchestrator.best_score / 5))]
+{"█" * int(orchestrator.best_score / 5) + "░" * (20 - int(orchestrator.best_score / 5))}
 
 🤖 AGENTS ACTIFS
 ────────────────

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Système Multi-Agents Auto-Correctif - Point d'entrée optimisé"""
-import logging, sys, argparse, time, json
+import logging
+import sys
+import argparse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s',
-                    handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler('system.log')])
-logger = logging.getLogger(__name__)
 
 from src.core import OllamaClient, OllamaConfig, MultiAgentOrchestrator
+from src.core.logging_config import setup_logging
 from src.utils.exporters import SolutionExporter, ReportGenerator
 from src.config.settings import OLLAMA_CONFIG, AGENT_MODELS, SYSTEM_CONFIG
+
+logger = None
 
 
 def setup_ollama_client():
@@ -118,13 +120,14 @@ Exemples:
 
 def main():
     """Fonction principale"""
+    global logger
     
     # Parse arguments
     args = parse_arguments()
     
-    # Setup logging
+    # Setup logging avec logging_config
+    logger = setup_logging(verbose=args.verbose)
     if args.verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
         logger.info("🔧 Mode DEBUG activé")
     
     logger.info("╔════════════════════════════════════════════════════════════╗")
