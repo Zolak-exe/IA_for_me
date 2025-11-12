@@ -352,7 +352,3 @@ MIT
 ## 👨‍💻 Support
 
 Pour problèmes ou suggestions, voir les logs dans `system.log`
-
----
-
-**Créé avec ❤️ pour la génération de projets autonome**
