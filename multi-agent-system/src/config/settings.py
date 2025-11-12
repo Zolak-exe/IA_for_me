@@ -90,3 +90,9 @@ STOP_CRITERIA = {
     "security_min_score": 80.0,          # Score minimum sécurité
     "review_min_score": 85.0             # Score minimum qualité
 }
+
+PROMPT_LIMITS = {
+    "architecture_context": 2000,
+    "code_context": 3000,
+    "requirements_context": 1000
+}

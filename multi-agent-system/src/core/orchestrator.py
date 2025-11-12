@@ -19,6 +19,7 @@ from ..agents import (
     DocumentationAgent,
     AgentOutput
 )
+from ..config.settings import SCORE_WEIGHTS, STOP_CRITERIA, AGENT_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +70,14 @@ class MultiAgentOrchestrator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(exist_ok=True)
         
-        # Initialiser les agents
+        # Initialiser les agents avec modèles explicites depuis settings
         self.agents = {
-            'architect': ArchitectAgent(ollama_client),
-            'developer': DeveloperAgent(ollama_client),
-            'reviewer': ReviewerAgent(ollama_client),
-            'security': SecurityAgent(ollama_client),
-            'tester': TesterAgent(ollama_client),
-            'documentation': DocumentationAgent(ollama_client)
+            'architect': ArchitectAgent(ollama_client, AGENT_MODELS.get("architect", "mistral")),
+            'developer': DeveloperAgent(ollama_client, AGENT_MODELS.get("developer", "codellama")),
+            'reviewer': ReviewerAgent(ollama_client, AGENT_MODELS.get("reviewer", "deepseek-coder")),
+            'security': SecurityAgent(ollama_client, AGENT_MODELS.get("security", "mistral")),
+            'tester': TesterAgent(ollama_client, AGENT_MODELS.get("tester", "qwen2.5-coder")),
+            'documentation': DocumentationAgent(ollama_client, AGENT_MODELS.get("documentation", "mistral"))
         }
         
         # State tracking
@@ -214,43 +215,47 @@ class MultiAgentOrchestrator:
         return metrics
     
     def _calculate_overall_score(self, metrics: IterationMetrics) -> float:
-        """Calcule un score global pondéré"""
-        weights = {
-            'review': 0.35,      # Qualité code
-            'security': 0.25,    # Sécurité (important!)
-            'tester': 0.20,      # Tests
-            'documentation': 0.20  # Documentation
-        }
-        
+        """Calcule un score global pondéré depuis settings.SCORE_WEIGHTS"""
         score = (
-            (metrics.reviewer_score or 0) * weights['review'] +
-            (metrics.security_score or 0) * weights['security'] +
-            (100.0 if metrics.tester_output else 0) * weights['tester'] +
-            (100.0 if metrics.documentation_output else 0) * weights['documentation']
+            (metrics.reviewer_score or 0) * SCORE_WEIGHTS['review_quality'] +
+            (metrics.security_score or 0) * SCORE_WEIGHTS['security'] +
+            (100.0 if metrics.tester_output else 0) * SCORE_WEIGHTS['testing'] +
+            (100.0 if metrics.documentation_output else 0) * SCORE_WEIGHTS['documentation']
         )
         
         return min(100.0, max(0.0, score))
     
     def _check_stop_criteria(self, metrics: IterationMetrics) -> tuple[bool, str]:
-        """Vérifie les critères d'arrêt"""
+        """Vérifie les critères d'arrêt depuis settings.STOP_CRITERIA"""
         
-        # Critère 1: Qualité atteinte
+        # Critère 1: Qualité globale atteinte
         if metrics.overall_score >= self.quality_threshold:
             return True, f"✅ Qualité {metrics.overall_score:.1f}% atteinte (seuil: {self.quality_threshold}%)"
         
-        # Critère 2: Stagnation (3 itérations sans amélioration)
-        if len(self.metrics_history) >= 3:
-            recent = self.metrics_history[-3:]
-            if all(m.overall_score <= self.best_score for m in recent):
-                return True, "✅ Stagnation détectée: 3 itérations sans amélioration"
+        # Critère 2: Scores minimums de sécurité et qualité
+        security_min = STOP_CRITERIA.get('security_min_score', 0)
+        review_min = STOP_CRITERIA.get('review_min_score', 0)
         
-        # Critère 3: Max itérations atteint
+        if metrics.security_score and metrics.security_score < security_min:
+            logger.warning(f"⚠️  Score sécurité {metrics.security_score:.1f}% < minimum {security_min}%")
+        
+        if metrics.reviewer_score and metrics.reviewer_score < review_min:
+            logger.warning(f"⚠️  Score qualité {metrics.reviewer_score:.1f}% < minimum {review_min}%")
+        
+        # Critère 3: Stagnation (N itérations sans amélioration)
+        stagnation_threshold = STOP_CRITERIA.get('stagnation_threshold', 3)
+        if len(self.metrics_history) >= stagnation_threshold:
+            recent = self.metrics_history[-stagnation_threshold:]
+            if all(m.overall_score <= self.best_score for m in recent):
+                return True, f"✅ Stagnation détectée: {stagnation_threshold} itérations sans amélioration"
+        
+        # Critère 4: Max itérations atteint
         if self.iteration_count >= self.max_iterations:
             return True, f"✅ Max itérations ({self.max_iterations}) atteint"
         
         return False, ""
     
-    def _display_iteration_summary(self, metrics: IterationMetrics):
+    def _display_iteration_summary(self, metrics: IterationMetrics) -> None:
         """Affiche un résumé de l'itération"""
         logger.info(f"""
         📊 ITÉRATION {metrics.iteration}:
@@ -262,7 +267,7 @@ class MultiAgentOrchestrator:
         └─ Meilleur: {self.best_score:.1f}% (itération {self.best_iteration})
         """)
     
-    def _display_final_summary(self):
+    def _display_final_summary(self) -> None:
         """Affiche le résumé final"""
         if not self.best_solution:
             logger.error("❌ Aucune solution trouvée")

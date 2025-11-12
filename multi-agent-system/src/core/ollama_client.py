@@ -25,10 +25,10 @@ class OllamaConfig:
 class OllamaClient:
     """Client pour interagir avec Ollama"""
     
-    def __init__(self, config: OllamaConfig = None):
+    def __init__(self, config: Optional[OllamaConfig] = None):
         self.config = config or OllamaConfig()
         self.session = requests.Session()
-        self.models_cache = {}
+        self.models_cache: list[str] = []
         
     def check_connection(self) -> bool:
         """Vérifie que Ollama est disponible"""
@@ -110,7 +110,7 @@ class OllamaClient:
         model: str,
         prompt: str,
         temperature: float = 0.7,
-    ):
+    ) -> str:
         """Génère du texte en streaming (pour affichage progressif)"""
         try:
             response = self.session.post(
